@@ -171,7 +171,7 @@ export async function sync(config: Config, dryRun: boolean) {
         changes++;
       } else if (existsSync(link)) {
         warn(
-          `${agent.name}/${skill} exists as local copy — run 'skiller adopt' first`
+          `${agent.name}/${skill} exists as local copy — run 'skillecta adopt' first`
         );
       } else {
         if (dryRun) {

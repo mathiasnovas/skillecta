@@ -8,17 +8,17 @@ import { status, sync, adopt, list } from "./skills.js";
 import { fmt } from "./output.js";
 
 const HELP = `
-${fmt.bold("skiller")} — sync agent skills from ~/.agents/skills
+${fmt.bold("skillecta")} — sync agent skills from ~/.agents/skills
 
 ${fmt.bold("Usage:")}
-  skiller status            Show skill state across all agents
-  skiller sync [--dry-run]  Link source skills to all agents
-  skiller adopt [--dry-run] Adopt untracked agent skills into source
-  skiller list              List source skills
+  skillecta status            Show skill state across all agents
+  skillecta sync [--dry-run]  Link source skills to all agents
+  skillecta adopt [--dry-run] Adopt untracked agent skills into source
+  skillecta list              List source skills
 
 ${fmt.bold("Config:")}
   ~/.agents/config.toml     Agent definitions (optional)
-  SKILLER_SOURCE            Override source dir (default: ~/.agents/skills)
+  SKILLECTA_SOURCE            Override source dir (default: ~/.agents/skills)
 
 ${fmt.bold("Config format:")}
   [agents.claude]

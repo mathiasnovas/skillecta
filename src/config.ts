@@ -21,13 +21,13 @@ const DEFAULT_AGENTS: AgentConfig[] = [
 ];
 
 export function getSourceDir(): string {
-  return process.env.SKILLER_SOURCE ?? resolve(HOME, ".agents/skills");
+  return process.env.SKILLECTA_SOURCE ?? resolve(HOME, ".agents/skills");
 }
 
 export async function loadConfig(): Promise<Config> {
   const source = resolve(getSourceDir());
   const configPath =
-    process.env.SKILLER_CONFIG ?? resolve(HOME, ".agents/config.toml");
+    process.env.SKILLECTA_CONFIG ?? resolve(HOME, ".agents/config.toml");
 
   if (!existsSync(configPath)) {
     return { source, agents: DEFAULT_AGENTS };

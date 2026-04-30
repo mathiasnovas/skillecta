@@ -1,5 +1,5 @@
 {
-  "name": "skiller",
+  "name": "@novasism/skiller",
   "version": "0.1.0",
   "description": "Sync agent skills across AI coding assistants",
   "type": "module",
@@ -15,6 +15,9 @@
     "prepublishOnly": "tsc"
   },
   "keywords": ["ai", "agents", "skills", "sync", "cli"],
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.6.0",

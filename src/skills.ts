@@ -1,7 +1,7 @@
-import { readdir, readlink, cp, rm, symlink, mkdir } from "node:fs/promises";
+import { readdir, readlink, cp, rm, symlink, mkdir, realpath } from "node:fs/promises";
 import { existsSync, lstatSync } from "node:fs";
-import { resolve } from "node:path";
-import type { Config, AgentConfig } from "./config.js";
+import { isAbsolute, relative, resolve } from "node:path";
+import type { Config } from "./config.js";
 import { fmt, ok, warn, info, err } from "./output.js";
 
 // ── Skill scanning ──────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export async function status(config: Config) {
   console.log();
 
   for (const agent of config.agents) {
-    const skillsPath = resolve(agent.path, agent.skillsDir);
+    const skillsPath = safeResolveWithin(agent.path, agent.skillsDir, `${agent.name}.skills_dir`);
     console.log(`${fmt.bold(agent.name)} ${fmt.dim(`(${skillsPath})`)}`);
 
     if (!existsSync(skillsPath)) {
@@ -88,16 +88,18 @@ export async function status(config: Config) {
 
     for (const entry of entries) {
       if (entry.broken) {
+        const targetLabel = entry.target ?? "(unknown target)";
         console.log(
-          `  ${fmt.red("✗")} ${entry.name} ${fmt.dim("→")} ${fmt.red(entry.target!)} ${fmt.yellow("(broken symlink)")}`
+          `  ${fmt.red("✗")} ${entry.name} ${fmt.dim("→")} ${fmt.red(targetLabel)} ${fmt.yellow("(broken symlink)")}`
         );
       } else if (entry.isSymlink && entry.pointsToSource) {
         console.log(
           `  ${fmt.green("✓")} ${entry.name} ${fmt.dim("→ source")}`
         );
       } else if (entry.isSymlink) {
+        const targetLabel = entry.target ?? "(unknown target)";
         console.log(
-          `  ${fmt.yellow("!")} ${entry.name} ${fmt.dim("→")} ${fmt.red(entry.target!)} ${fmt.yellow("(not linked to source)")}`
+          `  ${fmt.yellow("!")} ${entry.name} ${fmt.dim("→")} ${fmt.red(targetLabel)} ${fmt.yellow("(not linked to source)")}`
         );
       } else {
         console.log(
@@ -139,7 +141,7 @@ export async function sync(config: Config, dryRun: boolean) {
       continue;
     }
 
-    const skillsPath = resolve(agent.path, agent.skillsDir);
+    const skillsPath = safeResolveWithin(agent.path, agent.skillsDir, `${agent.name}.skills_dir`);
 
     if (!existsSync(skillsPath)) {
       if (dryRun) {
@@ -151,8 +153,8 @@ export async function sync(config: Config, dryRun: boolean) {
     }
 
     for (const skill of sourceSkills) {
-      const link = resolve(skillsPath, skill);
-      const target = resolve(config.source, skill);
+      const link = safeResolveWithin(skillsPath, skill, `${agent.name}/${skill}`);
+      const target = safeResolveWithin(config.source, skill, `source/${skill}`);
 
       if (lstatSafe(link)?.isSymbolicLink()) {
         const current = await readlink(link);
@@ -194,14 +196,14 @@ export async function adopt(config: Config, dryRun: boolean) {
   let adopted = 0;
 
   for (const agent of config.agents) {
-    const skillsPath = resolve(agent.path, agent.skillsDir);
+    const skillsPath = safeResolveWithin(agent.path, agent.skillsDir, `${agent.name}.skills_dir`);
     if (!existsSync(skillsPath)) continue;
 
     const entries = await scanAgentSkills(skillsPath, config.source);
 
     for (const entry of entries) {
-      const itemPath = resolve(skillsPath, entry.name);
-      const sourcePath = resolve(config.source, entry.name);
+      const itemPath = safeResolveWithin(skillsPath, entry.name, `${agent.name}/${entry.name}`);
+      const sourcePath = safeResolveWithin(config.source, entry.name, `source/${entry.name}`);
 
       // Already correctly linked — skip
       if (entry.isSymlink && entry.pointsToSource) continue;
@@ -228,7 +230,7 @@ export async function adopt(config: Config, dryRun: boolean) {
       if (!existsSync(sourcePath)) {
         if (entry.isSymlink) {
           // Symlink to somewhere else — resolve and copy
-          const resolved = resolve(skillsPath, await readlink(itemPath));
+          const resolved = await resolveAdoptSource(itemPath, skillsPath, agent.path);
           if (dryRun) {
             info(
               `Would adopt ${agent.name}/${entry.name} → source (from ${resolved})`
@@ -280,6 +282,33 @@ export async function list(config: Config) {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
+
+function safeResolveWithin(base: string, child: string, label: string): string {
+  const resolved = resolve(base, child);
+  if (!isPathWithin(base, resolved)) {
+    throw new Error(`Refusing unsafe path for ${label}: ${child}`);
+  }
+  return resolved;
+}
+
+function isPathWithin(base: string, target: string): boolean {
+  const rel = relative(base, target);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+async function resolveAdoptSource(itemPath: string, skillsPath: string, agentRoot: string): Promise<string> {
+  const symlinkTarget = await readlink(itemPath);
+  const resolved = resolve(skillsPath, symlinkTarget);
+  const canonical = await realpath(resolved).catch(() => resolved);
+
+  if (!isPathWithin(skillsPath, canonical) && !isPathWithin(agentRoot, canonical)) {
+    throw new Error(
+      `Refusing to adopt symlink target outside agent directories: ${symlinkTarget}`
+    );
+  }
+
+  return canonical;
+}
 
 function lstatSafe(p: string) {
   try {

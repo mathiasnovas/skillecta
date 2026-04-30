@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, normalize, resolve } from "node:path";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
 
@@ -25,7 +25,7 @@ export function getSourceDir(): string {
 }
 
 export async function loadConfig(): Promise<Config> {
-  const source = getSourceDir();
+  const source = resolve(getSourceDir());
   const configPath =
     process.env.SKILLER_CONFIG ?? resolve(HOME, ".agents/config.toml");
 
@@ -36,10 +36,7 @@ export async function loadConfig(): Promise<Config> {
   const content = await readFile(configPath, "utf-8");
   const agents = parseAgentsFromToml(content);
 
-  return {
-    source,
-    agents: agents.length > 0 ? agents : DEFAULT_AGENTS,
-  };
+  return { source, agents: normalizeAgents(agents.length > 0 ? agents : DEFAULT_AGENTS) };
 }
 
 function parseAgentsFromToml(content: string): AgentConfig[] {
@@ -86,4 +83,27 @@ function parseAgentsFromToml(content: string): AgentConfig[] {
   }
 
   return agents;
+}
+
+function normalizeAgents(agents: AgentConfig[]): AgentConfig[] {
+  return agents.map((agent) => ({
+    ...agent,
+    path: resolve(agent.path),
+    skillsDir: normalizeSkillsDir(agent.skillsDir),
+  }));
+}
+
+function normalizeSkillsDir(skillsDir: string): string {
+  const normalized = normalize(skillsDir);
+
+  if (!normalized || isAbsolute(normalized)) {
+    throw new Error(`Invalid skills_dir "${skillsDir}". Use a relative path, e.g. "skills".`);
+  }
+
+  const parts = normalized.split(/[\\/]+/).filter(Boolean);
+  if (parts.length === 0 || parts.some((part) => part === "..")) {
+    throw new Error(`Invalid skills_dir "${skillsDir}". Path traversal is not allowed.`);
+  }
+
+  return normalized;
 }

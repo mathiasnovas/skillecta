@@ -1,0 +1,23 @@
+{
+  "name": "skiller",
+  "version": "0.1.0",
+  "description": "Sync agent skills across AI coding assistants",
+  "type": "module",
+  "bin": {
+    "skiller": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": ["ai", "agents", "skills", "sync", "cli"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}
